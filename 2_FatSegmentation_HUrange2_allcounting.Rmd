@@ -1,0 +1,642 @@
+---
+title: "Range2: -250 to -24.21 HU"
+output: html_notebook
+---
+
+### This protocol requires slice numbers of anatomical landmarks (from step 1, code: 1_sliceselection.imj) to locate the body regions.
+
+ 
+### This Stockholm_trip_version removes loops. It outputs csv result files for 1D, 2D  and 3D estimates.
+```{r}
+install.packages("oro.nifti")
+install.packages("oro.dicom")
+
+library(oro.dicom)
+library(rlist)
+library(oro.nifti)
+```
+
+
+### ################ INPUTS FROM IMAGEJ ###########################
+```{r}
+slice_number_start_rabbit <- 13 # From imageJ for use with whole body adipose counts
+slice_number_end_rabbit <- 600 # From ImageJ for use with whole body adipose counts
+slice_number_start_abdomen <- 212  # From imageJ for use with whole body adipose counts
+slice_number_end_abdomen <- 381 # From ImageJ for use with whole body adipose counts
+rescale_intercept <- -8192 # From ImageJ for use with each image to covert raw pixel values to HU values to 
+```
+
+### ############ SLICE POSITIONE FOR KIDNEYS ###############
+```{r}
+right_kidney<- 268
+left_kidney<- 293
+```
+
+
+### ################ END OF INPUTS FROM IMAGEJ##############
+```{r}
+####### Setting up results dataFrame(S) for 1D, 2D and 3D analysis
+df_results_1D <- data.frame(matrix(vector(),ncol=5))
+colnames(df_results_1D) <-c("animal_ID", "wholeBody_1D","abdomen_1D","r_kidney_1D", "l_kidney_1D")
+
+df_results_2D <- data.frame(matrix(vector(),ncol=5)) # dataframe for counts  allowing for nearest neighbor in the slice
+colnames(df_results_2D) <-c("animal_ID", "wholeBody_2D","abdomen_2D","r_kidney_2D", "l_kidney_2D")
+
+df_results_3D <- data.frame(matrix(vector(),ncol=5)) # dataframe for counts  allowing for nearest neighbor in the slice and in immediate neighbor slices
+colnames(df_results_3D) <-c("animal_ID", "wholeBody_3D","abdomen_3D","r_kidney_3D", "l_kidney_3D")
+```
+
+### Image Directory ###
+### dcmImage=readDICOMFile("/home/fme/Documents/work_on_the_go/rabbit_ct_body_composition/MetteHalc_rabbits/M93885/M93885_0335.dcm")
+```{r}
+dicom_path <- "C:\\Users\\XXX" ## put image directory
+
+dcmImages <- readDICOM(dicom_path, verbose = TRUE, recursive = TRUE)
+
+patientID <- extractHeader(dcmImages$hdr[1], string="PatientID", numeric=FALSE)
+
+dim(t(dcmImages$img))
+```
+
+
+### Range2 using HU value from -250 to -24.21 (value between avergae fat and soft tissue peak value) ###############
+```{r}
+range1_max = -24.21 
+
+range1_min = -250
+
+range1_max
+range1_min
+```
+
+### #############################################################
+### #############################################################
+### #############################################################
+### #############################################################
+
+
+### ############## KIDNEY #####################
+### ############## KIDNEY #####################
+### ############## KIDNEY #####################
+### ############## KIDNEY #####################
+
+
+### ############## ONE SLICE - left kidney 1D #####################
+```{r}
+im_data <- t(dcmImages$img[[left_kidney]])
+D1_mask_im_data <- t(dcmImages$img[[left_kidney]])
+D1_mask_im_data[,]<-0
+
+im_data_HU <- im_data + rescale_intercept
+r1_l_kidney = length(which(im_data_HU>=range1_min & im_data_HU <= range1_max))
+
+
+counter=0
+for (i in 1:512){
+  for (j in 1:512){
+    if (im_data_HU[i,j]>= range1_min & im_data_HU[i,j]<= range1_max){
+      counter= counter+1
+      D1_mask_im_data[i,j] <- 7200
+      #print(im_data_HU[i,j])
+    }
+  }
+}
+counter
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney", ylab = "", useRaster = TRUE)
+image(D1_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney D1 mask", ylab = "", useRaster = TRUE)
+ 
+##SAVE TO RESULTS
+df_results_1D[1,"animal_ID"]= patientID
+df_results_1D[1,"l_kidney_1D"]=r1_l_kidney
+df_results_1D[1, "HU_min"] <- range1_min
+df_results_1D[1, "HU_max"] <- range1_max
+df_results_1D
+
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_left_kidney_R2_1D_image")
+nifti_mask_filename <- paste0(patientID, "_left_kidney_R2_1D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D1_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+```
+
+
+### ############## ONE SLICE - right kidney 1D #####################
+```{r}
+im_data <- t(dcmImages$img[[right_kidney]])
+D1_mask_im_data <- t(dcmImages$img[[right_kidney]])
+D1_mask_im_data[,]<-0
+
+im_data_HU <- im_data + rescale_intercept
+pixel_counter = length(which(im_data_HU>=range1_min & im_data_HU <= range1_max))
+
+
+for (i in 1:512){
+  for (j in 1:512){
+    if (im_data_HU[i,j]>= range1_min & im_data_HU[i,j]<= range1_max){
+      D1_mask_im_data[i,j] <- 7200
+      #print(im_data_HU[i,j])
+    }
+  }
+}
+
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "right kidney", ylab = "", useRaster = TRUE)
+image(D1_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "right kidney D1 mask", ylab = "", useRaster = TRUE)
+
+##SAVE TO RESULTS
+df_results_1D[1,"animal_ID"]= patientID
+df_results_1D[1,"r_kidney_1D"]=pixel_counter
+df_results_1D
+
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_right_kidney_R2_1D_image")
+nifti_mask_filename <- paste0(patientID, "_right_kidney_R2_1D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D1_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+
+```
+
+
+### ############## ONE SLICE - left kidney 2D #####################
+```{r}
+pixel_counter <- 0
+im_data <- t(dcmImages$img[[left_kidney]])
+D2_mask_im_data <- t(dcmImages$img[[left_kidney]])
+D2_mask_im_data[100,100]
+D2_mask_im_data[,]<-0
+#D2_mask_im_data[100,100]
+
+im_data_HU <- im_data + rescale_intercept
+for (i in 2:511){
+  for (j in 2:511){
+    cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1]
+                )
+    if (sum(cube>=range1_min & cube <=range1_max)==9){
+        pixel_counter <-  pixel_counter+1
+        D2_mask_im_data[i,j] <- 7200
+    }
+  }
+}
+
+pixel_counter
+
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney", ylab = "", useRaster = TRUE)
+image(D2_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney D2 mask", ylab = "", useRaster = TRUE)
+df_results_2D[1,"l_kidney_2D"] <- pixel_counter
+df_results_2D[1,"animal_ID"]= patientID
+df_results_2D[1, "HU_min"] <- range1_min
+df_results_2D[1, "HU_max"] <- range1_max
+df_results_2D
+
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_left_kidney_R2_2D_image")
+nifti_mask_filename <- paste0(patientID, "_left_kidney_R2_2D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D2_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+
+```
+
+
+
+
+### ############## ONE SLICE - right kidney 2D #####################
+```{r}
+pixel_counter <- 0
+im_data <- t(dcmImages$img[[right_kidney]])
+D2_mask_im_data <- t(dcmImages$img[[right_kidney]])
+D2_mask_im_data[100,100]
+D2_mask_im_data[,]<-0
+#D2_mask_im_data[100,100]
+
+im_data_HU <- im_data + rescale_intercept
+for (i in 2:511){
+  for (j in 2:511){
+    cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1]
+    )
+    if (sum(cube>=range1_min & cube <=range1_max)==9){
+      pixel_counter <-  pixel_counter+1
+      D2_mask_im_data[i,j] <- 7200
+    }
+  }
+}
+
+pixel_counter
+
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "Right Kidney", ylab = "", useRaster = TRUE)
+image(D2_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "right ridney D2 mask", ylab = "", useRaster = TRUE)
+
+
+df_results_2D[1,"animal_ID"]= patientID
+df_results_2D[1, "r_kidney_2D"] <- pixel_counter
+df_results_2D[1, "HU_min"] <- range1_min
+df_results_2D[1, "HU_max"] <- range1_max
+df_results_2D
+
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_right_kidney_R2_2D_image")
+nifti_mask_filename <- paste0(patientID, "_right_kidney_R2_2D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D2_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+
+```
+
+
+### ############# One Slice - left kidney 3D #######################
+
+```{r}
+pixel_counter=0
+slice_number=left_kidney
+im_data <- t(dcmImages$img[[slice_number]])
+im_data_less_one <- t(dcmImages$img[[slice_number-1]])
+im_data_plus_one <- t(dcmImages$img[[slice_number+1]])
+D3_mask_im_data <- t(dcmImages$img[[slice_number]])
+D3_mask_im_data[100,100]
+D3_mask_im_data[,]<-0
+D3_mask_im_data[100,100]
+
+
+im_data_HU <- im_data + rescale_intercept
+im_data_HU_less_one <- im_data_less_one + rescale_intercept
+im_data_HU_plus_one <- im_data_plus_one + rescale_intercept
+for (i in 2:511){
+  for (j in 2:511){
+    cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1],
+                im_data_HU_less_one[i-1,j-1],im_data_HU_less_one[i-1,j],im_data_HU_less_one[i-1,j+1],
+                im_data_HU_less_one[i,j-1],im_data_HU_less_one[i,j],im_data_HU_less_one[i,j+1],
+                im_data_HU_less_one[i+1,j-1],im_data_HU_less_one[i+1,j],im_data_HU_less_one[i+1,j+1],
+                im_data_HU_plus_one[i-1,j-1],im_data_HU_plus_one[i-1,j],im_data_HU_plus_one[i-1,j+1],
+                im_data_HU_plus_one[i,j-1],im_data_HU_plus_one[i,j],im_data_HU_plus_one[i,j+1],
+                im_data_HU_plus_one[i+1,j-1],im_data_HU_plus_one[i+1,j],im_data_HU_plus_one[i+1,j+1]
+                )
+    if (sum(cube>=range1_min & cube <=range1_max)==27){
+      pixel_counter <-  pixel_counter+1
+      D3_mask_im_data[i,j] <- 7200
+    }
+  }
+}
+
+pixel_counter
+
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney", ylab = "", useRaster = TRUE)
+image(D3_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "left kidney D3 mask", ylab = "", useRaster = TRUE)
+
+
+df_results_3D[1,"animal_ID"]= patientID
+df_results_3D[1, "l_kidney_3D"] <- pixel_counter
+df_results_3D[1, "HU_min"] <- range1_min
+df_results_3D[1, "HU_max"] <- range1_max
+df_results_3D
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_left_kidney_R2_3D_image")
+nifti_mask_filename <- paste0(patientID, "_left_kidney_R2_3D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D3_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+
+```
+
+
+### ############# One Slice - right kidney 3D #######################
+
+```{r}
+pixel_counter=0
+slice_number=right_kidney
+im_data <- t(dcmImages$img[[slice_number]])
+im_data_less_one <- t(dcmImages$img[[slice_number-1]])
+im_data_plus_one <- t(dcmImages$img[[slice_number+1]])
+D3_mask_im_data <- t(dcmImages$img[[slice_number]])
+D3_mask_im_data[100,100]
+D3_mask_im_data[,]<-0
+D3_mask_im_data[100,100]
+
+
+im_data_HU <- im_data + rescale_intercept
+im_data_HU_less_one <- im_data_less_one + rescale_intercept
+im_data_HU_plus_one <- im_data_plus_one + rescale_intercept
+for (i in 2:511){
+  for (j in 2:511){
+    cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1],
+                im_data_HU_less_one[i-1,j-1],im_data_HU_less_one[i-1,j],im_data_HU_less_one[i-1,j+1],
+                im_data_HU_less_one[i,j-1],im_data_HU_less_one[i,j],im_data_HU_less_one[i,j+1],
+                im_data_HU_less_one[i+1,j-1],im_data_HU_less_one[i+1,j],im_data_HU_less_one[i+1,j+1],
+                im_data_HU_plus_one[i-1,j-1],im_data_HU_plus_one[i-1,j],im_data_HU_plus_one[i-1,j+1],
+                im_data_HU_plus_one[i,j-1],im_data_HU_plus_one[i,j],im_data_HU_plus_one[i,j+1],
+                im_data_HU_plus_one[i+1,j-1],im_data_HU_plus_one[i+1,j],im_data_HU_plus_one[i+1,j+1]
+    )
+    if (sum(cube>=range1_min & cube <=range1_max)==27){
+      pixel_counter <-  pixel_counter+1
+      D3_mask_im_data[i,j] <- 7200
+    }
+  }
+}
+
+pixel_counter
+
+
+image(im_data, col = grey(0:64/64), axes = FALSE, xlab = "right kidney", ylab = "", useRaster = TRUE)
+image(D3_mask_im_data, col = grey(0:64/64), axes = FALSE, xlab = "right kidney D3 mask", ylab = "", useRaster = TRUE)
+
+df_results_3D[1,"animal_ID"]= patientID
+df_results_3D[1, "r_kidney_3D"] <- pixel_counter
+df_results_3D[1, "HU_min"] <- range1_min
+df_results_3D[1, "HU_max"] <- range1_max
+df_results_3D
+
+
+############################################################
+# Automatically use the same directory as the DICOM images
+output_dir <- dicom_path  # Use the same path as readDICOM()
+
+# Add patientID as prefix to the filenames
+nifti_image_filename <- paste0(patientID, "_right_kidney_R2_3D_image")
+nifti_mask_filename <- paste0(patientID, "_right_kidney_R2_3D_mask")
+
+# Save the NIfTI files with the updated filenames
+writeNIfTI(im_data, file.path(output_dir, nifti_image_filename))
+writeNIfTI(D3_mask_im_data, file.path(output_dir, nifti_mask_filename))
+
+cat("NIfTI files saved in:", output_dir, "\n")
+
+
+```
+
+
+### ############## W H O L E   B O D Y ########################
+### ############## W H O L E   B O D Y ########################
+### ############## W H O L E   B O D Y ########################
+
+
+### ################ WHOLE BODY - 1D #################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (i in (slice_number_start_rabbit+1):slice_number_end_rabbit-1){
+  im_data <- t(dcmImages$img[[i]])
+  im_data_HU <- im_data + rescale_intercept
+  pixel_counter = pixel_counter+length(which(im_data_HU>=range1_min & im_data_HU <= range1_max))
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_1D[1,"animal_ID"]= patientID
+df_results_1D[1,"wholeBody_1D"]=pixel_counter
+df_results_1D
+
+```
+
+
+
+
+### ################ WHOLE BODY - 2D #################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (h in (slice_number_start_rabbit+1):slice_number_end_rabbit-1){
+  im_data <- t(dcmImages$img[[h]])
+  im_data_HU <- im_data + rescale_intercept
+  
+  for (i in 2:511){
+    for (j in 2:511){
+    cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1]
+                )
+      if (sum(cube>=range1_min & cube <=range1_max)==9){
+      pixel_counter <-  pixel_counter+1
+    }
+  }
+
+  }
+  print(h)
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_2D[1,"animal_ID"]= patientID
+df_results_2D[1,"wholeBody_2D"]=pixel_counter
+df_results_2D
+
+```
+
+### ################# WHOLE BODY - 3D #################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (h in (slice_number_start_rabbit+1):(slice_number_end_rabbit-1)){
+  im_data <- t(dcmImages$img[[h]])
+  im_data_less_one <- t(dcmImages$img[[h-1]])
+  im_data_plus_one <- t(dcmImages$img[[h+1]])
+  im_data_HU <- im_data + rescale_intercept
+  im_data_HU_less_one <- im_data_less_one + rescale_intercept
+  im_data_HU_plus_one <- im_data_plus_one + rescale_intercept
+  
+  for (i in 2:511){
+    for (j in 2:511){
+      cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1],
+                im_data_HU_less_one[i-1,j-1],im_data_HU_less_one[i-1,j],im_data_HU_less_one[i-1,j+1],
+                im_data_HU_less_one[i,j-1],im_data_HU_less_one[i,j],im_data_HU_less_one[i,j+1],
+                im_data_HU_less_one[i+1,j-1],im_data_HU_less_one[i+1,j],im_data_HU_less_one[i+1,j+1],
+                im_data_HU_plus_one[i-1,j-1],im_data_HU_plus_one[i-1,j],im_data_HU_plus_one[i-1,j+1],
+                im_data_HU_plus_one[i,j-1],im_data_HU_plus_one[i,j],im_data_HU_plus_one[i,j+1],
+                im_data_HU_plus_one[i+1,j-1],im_data_HU_plus_one[i+1,j],im_data_HU_plus_one[i+1,j+1]
+    )
+      if (sum(cube>=range1_min & cube <=range1_max)==27){
+        pixel_counter <-  pixel_counter+1
+      }
+    }
+  }
+  print(h)
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_3D[1,"animal_ID"]= patientID
+df_results_3D[1,"wholeBody_3D"]=pixel_counter
+df_results_3D
+```
+
+
+
+### ################# A B D O M EN #########################
+### ################# A B D O M EN #########################
+### ################# A B D O M EN #########################
+
+
+### ############### ABDOMEN - 1D ##############################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (i in (slice_number_start_abdomen):slice_number_end_abdomen){
+  im_data <- t(dcmImages$img[[i]])
+  im_data_HU <- im_data + rescale_intercept
+  pixel_counter = pixel_counter+length(which(im_data_HU>=range1_min & im_data_HU <= range1_max))
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_1D[1,"animal_ID"]= patientID
+df_results_1D[1,"abdomen_1D"]=pixel_counter
+df_results_1D
+```
+
+### ############## ABDOMEN - 2D ################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (h in (slice_number_start_abdomen):slice_number_end_abdomen){
+  im_data <- t(dcmImages$img[[h]])
+  im_data_HU <- im_data + rescale_intercept
+  
+  for (i in 2:511){
+    for (j in 2:511){
+      cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                  im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                  im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1]
+      )
+      if (sum(cube>=range1_min & cube <=range1_max)==9){
+        pixel_counter <-  pixel_counter+1
+      }
+    }
+    
+  }
+  print(h)
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_2D[1,"animal_ID"]= patientID
+df_results_2D[1,"abdomen_2D"]=pixel_counter
+df_results_2D
+
+```
+
+### ################ ABDOMEN - 3D ################
+```{r}
+pixel_counter <- 0 # A COUNTER OF PIXELS WHOS VALES ARE IN "RANGE 1"
+for (h in (slice_number_start_abdomen):slice_number_end_abdomen){
+  im_data <- t(dcmImages$img[[h]])
+  im_data_less_one <- t(dcmImages$img[[h-1]])
+  im_data_plus_one <- t(dcmImages$img[[h+1]])
+  im_data_HU <- im_data + rescale_intercept
+  im_data_HU_less_one <- im_data_less_one + rescale_intercept
+  im_data_HU_plus_one <- im_data_plus_one + rescale_intercept
+  
+  for (i in 2:511){
+    for (j in 2:511){
+      cube = list(im_data_HU[i-1,j-1],im_data_HU[i-1,j],im_data_HU[i-1,j+1],
+                im_data_HU[i,j-1],im_data_HU[i,j],im_data_HU[i,j+1],
+                im_data_HU[i+1,j-1],im_data_HU[i+1,j],im_data_HU[i+1,j+1],
+                im_data_HU_less_one[i-1,j-1],im_data_HU_less_one[i-1,j],im_data_HU_less_one[i-1,j+1],
+                im_data_HU_less_one[i,j-1],im_data_HU_less_one[i,j],im_data_HU_less_one[i,j+1],
+                im_data_HU_less_one[i+1,j-1],im_data_HU_less_one[i+1,j],im_data_HU_less_one[i+1,j+1],
+                im_data_HU_plus_one[i-1,j-1],im_data_HU_plus_one[i-1,j],im_data_HU_plus_one[i-1,j+1],
+                im_data_HU_plus_one[i,j-1],im_data_HU_plus_one[i,j],im_data_HU_plus_one[i,j+1],
+                im_data_HU_plus_one[i+1,j-1],im_data_HU_plus_one[i+1,j],im_data_HU_plus_one[i+1,j+1]
+    )
+      if (sum(cube>=range1_min & cube <=range1_max)==27){
+        pixel_counter <-  pixel_counter+1
+        
+      }
+    }
+  }
+  print(h)
+}
+
+pixel_counter
+# HU range 1  for all slices
+##SAVE TO RESULTS
+df_results_3D[1,"animal_ID"]= patientID
+df_results_3D[1,"abdomen_3D"]=pixel_counter
+df_results_3D
+```
+
+### #################### E N D ######################
+### #################### E N D ######################
+### #################### E N D ######################
+
+#### Exports the 3 dataframes to csv files
+```{r}
+df_results_1D
+df_results_2D
+df_results_3D
+
+write.csv(df_results_1D,paste0(dicom_path, patientID,"_R2_1Dn.csv"), row.names = FALSE)
+write.csv(df_results_2D,paste0(dicom_path, patientID,"_R2_2Dn.csv"), row.names = FALSE)
+write.csv(df_results_3D,paste0(dicom_path, patientID,"_R2_3Dn.csv"), row.names = FALSE)
+
+
+print(paste("Files saved to", dicom_path))
+
+print("completed !")
+```
+
+
+### #################### E N D ######################
+### #################### E N D ######################
+### #################### E N D ######################
+### #################### E N D ######################
+
+
